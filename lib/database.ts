@@ -68,7 +68,7 @@ export class DatabaseService {
     accessToken: string,
     refreshToken?: string,
     tokenType: string = 'Bearer',
-    expiresIn: number = 3600,
+    expiresIn: number = 604800, // CLIO tokens expire in 7 days (604800 seconds)
     scope: string = ''
   ): Promise<ClioToken | null> {
     try {

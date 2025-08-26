@@ -90,6 +90,14 @@ export async function GET(request: NextRequest) {
 
     const tokenData = await tokenResponse.json();
     
+    console.log('🔍 Raw token response from CLIO:', {
+      access_token: tokenData.access_token ? 'Present' : 'Missing',
+      refresh_token: tokenData.refresh_token ? 'Present' : 'Missing',
+      expires_in: tokenData.expires_in,
+      token_type: tokenData.token_type,
+      scope: tokenData.scope
+    });
+    
     if (!tokenData.access_token) {
       console.error('No access token in response:', tokenData);
       return NextResponse.redirect(
@@ -98,10 +106,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Store the token in memory (for development) and database (for production)
+    // CLIO tokens expire in 604800 seconds (7 days) according to their documentation
+    const expiresIn = tokenData.expires_in || 604800;
     tokenStorage.storeToken('default', {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
-      expires_in: tokenData.expires_in || 3600, // Default to 1 hour if not provided
+      expires_in: expiresIn,
       token_type: tokenData.token_type || 'Bearer',
       scope: tokenData.scope || '',
       created_at: Date.now()
@@ -118,7 +128,7 @@ export async function GET(request: NextRequest) {
           tokenData.access_token,
           tokenData.refresh_token,
           tokenData.token_type || 'Bearer',
-          tokenData.expires_in || 3600,
+          expiresIn,
           tokenData.scope || ''
         );
         
