@@ -109,9 +109,11 @@ export async function GET(request: NextRequest) {
 
     // Also store in database for persistence across serverless function restarts
     try {
+      console.log('🗄️ Storing token in database...');
       const defaultUser = await DatabaseService.getDefaultUser();
       if (defaultUser) {
-        await DatabaseService.storeClioToken(
+        console.log('👤 Found default user:', defaultUser.id);
+        const storedToken = await DatabaseService.storeClioToken(
           defaultUser.id,
           tokenData.access_token,
           tokenData.refresh_token,
@@ -119,7 +121,12 @@ export async function GET(request: NextRequest) {
           tokenData.expires_in || 3600,
           tokenData.scope || ''
         );
-        console.log('✅ Token also stored in database');
+        
+        if (storedToken) {
+          console.log('✅ Token stored in database successfully:', storedToken.id);
+        } else {
+          console.error('❌ Failed to store token in database');
+        }
       } else {
         console.error('❌ Could not get/create default user for database storage');
       }

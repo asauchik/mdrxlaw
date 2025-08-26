@@ -72,11 +72,24 @@ export class DatabaseService {
     scope: string = ''
   ): Promise<ClioToken | null> {
     try {
+      console.log('🔐 Storing CLIO token for user:', userId);
+      console.log('Token details:', {
+        tokenType,
+        expiresIn,
+        scope,
+        hasRefreshToken: !!refreshToken,
+        accessTokenLength: accessToken?.length
+      });
+      
       // First, delete any existing tokens for this user
-      await supabase
+      const { error: deleteError } = await supabase
         .from('clio_tokens')
         .delete()
         .eq('user_id', userId);
+
+      if (deleteError) {
+        console.warn('Warning deleting existing tokens:', deleteError.message);
+      }
 
       // Insert the new token
       const { data, error } = await supabase
@@ -97,6 +110,7 @@ export class DatabaseService {
         return null;
       }
 
+      console.log('✅ CLIO token stored successfully:', data.id);
       return data;
     } catch (error) {
       console.error('Database error storing CLIO token:', error);
@@ -176,12 +190,26 @@ export class DatabaseService {
   static async getDefaultUser(): Promise<User | null> {
     const defaultEmail = 'default@mdrxlaw.com';
     
-    let user = await this.getUserByEmail(defaultEmail);
-    
-    if (!user) {
-      user = await this.createUser(defaultEmail, 'Default User');
+    try {
+      console.log('🔍 Looking for default user:', defaultEmail);
+      let user = await this.getUserByEmail(defaultEmail);
+      
+      if (!user) {
+        console.log('👤 Creating default user...');
+        user = await this.createUser(defaultEmail, 'Default User');
+        if (user) {
+          console.log('✅ Default user created:', user.id);
+        } else {
+          console.error('❌ Failed to create default user');
+        }
+      } else {
+        console.log('✅ Found existing default user:', user.id);
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Error in getDefaultUser:', error);
+      return null;
     }
-    
-    return user;
   }
 }
