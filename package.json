@@ -7,10 +7,14 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate": "node -r dotenv/config scripts/migrate.mjs",
+    "db:migrate": "node -r dotenv/config scripts/migrate.mjs",
+    "db:test": "node scripts/test-db.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",
+    "dotenv": "^17.2.1",
     "next": "15.5.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
