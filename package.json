@@ -10,7 +10,8 @@
     "lint": "eslint",
     "migrate": "node -r dotenv/config scripts/migrate.mjs",
     "db:migrate": "node -r dotenv/config scripts/migrate.mjs",
-    "db:test": "node scripts/test-db.mjs"
+    "db:test": "node scripts/test-db.mjs",
+    "mcp:supabase": "node scripts/mcp-supabase.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",
