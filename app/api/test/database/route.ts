@@ -32,7 +32,7 @@ export async function GET() {
     // Test basic connection
     const { error } = await supabase
       .from('users')
-      .select('count(*)')
+      .select('id')
       .limit(1);
     
     if (error) {
@@ -45,6 +45,13 @@ export async function GET() {
     }
     
     console.log('✅ Database connection successful');
+    
+    // Get total user count
+    const { data: allUsers } = await supabase
+      .from('users')
+      .select('id');
+    
+    const userCount = allUsers?.length || 0;
     
     // Check if default user exists
     const { data: defaultUser, error: userError } = await supabase
@@ -68,6 +75,7 @@ export async function GET() {
           hasAnonKey: !!supabaseAnonKey,
           hasServiceKey: !!serviceRoleKey
         },
+        totalUsers: userCount,
         defaultUser: userError ? null : {
           id: defaultUser?.id,
           email: defaultUser?.email,
