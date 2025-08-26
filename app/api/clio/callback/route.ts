@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tokenStorage } from '@/lib/token-storage';
 import { DatabaseService } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
@@ -105,19 +104,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Store the token in memory (for development) and database (for production)
+    // Store ONLY in database for persistence across serverless function restarts
+    // NO in-memory storage - doesn't work in serverless environments
     // CLIO tokens expire in 604800 seconds (7 days) according to their documentation
     const expiresIn = tokenData.expires_in || 604800;
-    tokenStorage.storeToken('default', {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_in: expiresIn,
-      token_type: tokenData.token_type || 'Bearer',
-      scope: tokenData.scope || '',
-      created_at: Date.now()
-    });
-
-    // Also store in database for persistence across serverless function restarts
+    
     try {
       console.log('🗄️ Storing token in database...');
       const defaultUser = await DatabaseService.getDefaultUser();
@@ -136,35 +127,29 @@ export async function GET(request: NextRequest) {
           console.log('✅ Token stored in database successfully:', storedToken.id);
         } else {
           console.error('❌ Failed to store token in database');
+          return NextResponse.redirect(
+            new URL('/?error=Token storage failed', baseUrl)
+          );
         }
       } else {
         console.error('❌ Could not get/create default user for database storage');
+        return NextResponse.redirect(
+          new URL('/?error=User setup failed', baseUrl)
+        );
       }
     } catch (dbError) {
       console.error('Database storage error:', dbError);
-      // Continue even if database storage fails
+      return NextResponse.redirect(
+        new URL('/?error=Database error', baseUrl)
+      );
     }
 
     console.log('✅ Access token received and stored successfully');
     console.log('Token type:', tokenData.token_type);
     console.log('Expires in:', tokenData.expires_in, 'seconds');
     console.log('Scope:', tokenData.scope);
-    console.log('🔍 Verifying token storage...');
     
-    // Verify the token was stored
-    const storedToken = tokenStorage.getValidAccessToken('default');
-    if (storedToken) {
-      console.log('✅ Token verified in storage');
-    } else {
-      console.error('❌ Token not found in storage after storing!');
-    }
-    
-    // For development, log the token (NEVER do this in production!)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Access token (first 20 chars):', tokenData.access_token?.substring(0, 20) + '...');
-      console.log('🔧 For development: Add this to your .env.local file:');
-      console.log(`CLIO_ACCESS_TOKEN=${tokenData.access_token}`);
-    }
+    console.log('🎉 OAuth flow completed - token stored in database');
     
     // Redirect back to the home page with success message
     return NextResponse.redirect(new URL('/?connected=true', baseUrl));

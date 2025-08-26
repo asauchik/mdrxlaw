@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { tokenStorage } from '@/lib/token-storage';
 import { DatabaseService } from '@/lib/database';
 
 export async function GET() {
@@ -16,47 +15,21 @@ export async function GET() {
       });
     }
 
-    // Check for stored access token (try in-memory, then database, then environment)
-    let accessToken = tokenStorage.getValidAccessToken('default');
-    console.log('🔍 In-memory token check:', accessToken ? 'Found' : 'Not found');
+    // Check for stored access token (database only - no in-memory storage in serverless)
+    let accessToken = null;
+    console.log('🗄️ Checking database for token...');
     
-    if (!accessToken) {
-      // Try database storage
-      try {
-        console.log('🗄️ Checking database for token...');
-        const defaultUser = await DatabaseService.getDefaultUser();
-        if (defaultUser) {
-          console.log('👤 Found default user:', defaultUser.id);
-          accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
-          console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
-          
-          // If we found a valid token in database, also store it in memory for faster access
-          if (accessToken) {
-            const dbToken = await DatabaseService.getClioToken(defaultUser.id);
-            if (dbToken) {
-              console.log('💾 Loading token into memory cache');
-              tokenStorage.storeToken('default', {
-                access_token: dbToken.access_token,
-                refresh_token: dbToken.refresh_token || undefined,
-                expires_in: dbToken.expires_in,
-                token_type: dbToken.token_type,
-                scope: dbToken.scope,
-                created_at: new Date(dbToken.created_at).getTime()
-              });
-            }
-          }
-        } else {
-          console.log('❌ No default user found in database');
-        }
-      } catch (dbError) {
-        console.error('Database error getting token:', dbError);
+    try {
+      const defaultUser = await DatabaseService.getDefaultUser();
+      if (defaultUser) {
+        console.log('👤 Found default user:', defaultUser.id);
+        accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
+        console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
+      } else {
+        console.log('❌ No default user found in database');
       }
-    }
-    
-    if (!accessToken) {
-      console.log('🔍 Checking environment variable for token...');
-      accessToken = process.env.CLIO_ACCESS_TOKEN || null;
-      console.log('🔍 Environment token check:', accessToken ? 'Found' : 'Not found');
+    } catch (dbError) {
+      console.error('Database error getting token:', dbError);
     }
     
     if (!accessToken) {
@@ -94,8 +67,17 @@ export async function GET() {
         });
       } else if (response.status === 401 || response.status === 403) {
         console.error('CLIO API authentication error:', response.status);
-        // Clear the invalid token from storage
-        tokenStorage.removeToken('default');
+        
+        // Clear the invalid token from database
+        try {
+          const defaultUser = await DatabaseService.getDefaultUser();
+          if (defaultUser) {
+            await DatabaseService.deleteClioToken(defaultUser.id);
+            console.log('🗑️ Cleared invalid token from database');
+          }
+        } catch (clearError) {
+          console.error('Error clearing invalid token:', clearError);
+        }
         
         return NextResponse.json({
           isConnected: false,

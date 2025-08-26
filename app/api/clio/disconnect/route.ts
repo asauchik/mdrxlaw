@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
-import { tokenStorage } from '@/lib/token-storage';
 import { DatabaseService } from '@/lib/database';
 
 export async function POST() {
   try {
-    // Try to get token from in-memory storage first
-    let accessToken = tokenStorage.getValidAccessToken('default');
+    // Try to get token from database first for revocation
+    let accessToken = null;
     
-    if (!accessToken) {
-      accessToken = process.env.CLIO_ACCESS_TOKEN || null;
+    try {
+      const defaultUser = await DatabaseService.getDefaultUser();
+      if (defaultUser) {
+        accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
+      }
+    } catch (dbError) {
+      console.error('Database error getting token for revocation:', dbError);
     }
 
     if (accessToken) {
@@ -35,10 +39,7 @@ export async function POST() {
       }
     }
 
-    // Clear the token from in-memory storage
-    tokenStorage.removeToken('default');
-
-    // Also clear from database
+    // Clear the token from database
     try {
       const defaultUser = await DatabaseService.getDefaultUser();
       if (defaultUser) {

@@ -1,26 +1,18 @@
 import { NextResponse } from 'next/server';
-import { tokenStorage } from '@/lib/token-storage';
 import { DatabaseService } from '@/lib/database';
 
 export async function GET() {
   try {
-    // Try to get token from in-memory storage first, then database
-    let accessToken = tokenStorage.getValidAccessToken('default');
+    // Try to get token from database only
+    let accessToken = null;
     
-    if (!accessToken) {
-      // Try database storage
-      try {
-        const defaultUser = await DatabaseService.getDefaultUser();
-        if (defaultUser) {
-          accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
-        }
-      } catch (dbError) {
-        console.error('Database error getting token:', dbError);
+    try {
+      const defaultUser = await DatabaseService.getDefaultUser();
+      if (defaultUser) {
+        accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
       }
-    }
-    
-    if (!accessToken) {
-      accessToken = process.env.CLIO_ACCESS_TOKEN || null;
+    } catch (dbError) {
+      console.error('Database error getting token:', dbError);
     }
 
     if (!accessToken) {
