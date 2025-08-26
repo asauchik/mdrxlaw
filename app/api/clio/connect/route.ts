@@ -1,0 +1,55 @@
+import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
+
+export async function POST() {
+  try {
+    const clioClientId = process.env.CLIO_CLIENT_ID;
+    const clioRedirectUri = process.env.CLIO_REDIRECT_URI;
+
+    if (!clioClientId || !clioRedirectUri) {
+      return NextResponse.json({
+        error: 'CLIO environment variables not configured. Please check your .env.local file.'
+      }, { status: 500 });
+    }
+
+    // Generate CLIO OAuth URL according to their documentation
+    const authUrl = new URL('https://app.clio.com/oauth/authorize');
+    authUrl.searchParams.append('response_type', 'code');
+    authUrl.searchParams.append('client_id', clioClientId);
+    authUrl.searchParams.append('redirect_uri', clioRedirectUri);
+    
+    // Request comprehensive scopes for legal practice management
+    const scopes = [
+      'read:user_profile',
+      'read:contacts',
+      'read:matters',
+      'read:documents',
+      'read:activities',
+      'read:calendar_entries',
+      'read:communications',
+      'read:custom_fields'
+    ].join(' ');
+    
+    authUrl.searchParams.append('scope', scopes);
+    
+    // Generate secure state parameter for CSRF protection
+    const state = randomBytes(32).toString('hex');
+    authUrl.searchParams.append('state', state);
+
+    // In production, you would store the state parameter securely
+    // associated with the user session to verify on callback
+    console.log('Generated OAuth state:', state);
+
+    return NextResponse.json({
+      authUrl: authUrl.toString(),
+      state,
+      message: 'Redirecting to CLIO for authorization...'
+    });
+
+  } catch (error) {
+    console.error('Connect error:', error);
+    return NextResponse.json({
+      error: 'Failed to generate authorization URL'
+    }, { status: 500 });
+  }
+}
