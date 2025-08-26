@@ -1,10 +1,10 @@
-import { supabase, ClioToken, User } from './supabase';
+import { supabaseAdmin, ClioToken, User } from './supabase';
 
 export class DatabaseService {
   // User management
   static async createUser(email: string, name?: string, clioUserId?: string): Promise<User | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('users')
         .insert([{ email, name, clio_user_id: clioUserId }])
         .select()
@@ -15,6 +15,7 @@ export class DatabaseService {
         return null;
       }
 
+      console.log('✅ User created successfully:', data.id);
       return data;
     } catch (error) {
       console.error('Database error creating user:', error);
@@ -24,7 +25,7 @@ export class DatabaseService {
 
   static async getUserByEmail(email: string): Promise<User | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('email', email)
@@ -44,7 +45,7 @@ export class DatabaseService {
 
   static async getUserByClioId(clioUserId: string): Promise<User | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('clio_user_id', clioUserId)
@@ -60,6 +61,28 @@ export class DatabaseService {
       console.error('Database error getting user by CLIO ID:', error);
       return null;
     }
+  }
+
+  // Default user management for single-user app
+  static async getDefaultUser(): Promise<User | null> {
+    console.log('🔍 Looking for default user: default@mdrxlaw.com');
+    
+    let user = await this.getUserByEmail('default@mdrxlaw.com');
+    
+    if (!user) {
+      console.log('👤 Creating default user...');
+      user = await this.createUser('default@mdrxlaw.com', 'Default User');
+      
+      if (user) {
+        console.log('✅ Created default user:', user.id);
+      } else {
+        console.error('❌ Failed to create default user');
+      }
+    } else {
+      console.log('✅ Found existing default user:', user.id);
+    }
+    
+    return user;
   }
 
   // Token management
@@ -82,7 +105,7 @@ export class DatabaseService {
       });
       
       // First, delete any existing tokens for this user
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await supabaseAdmin
         .from('clio_tokens')
         .delete()
         .eq('user_id', userId);
@@ -92,7 +115,7 @@ export class DatabaseService {
       }
 
       // Insert the new token
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('clio_tokens')
         .insert([{
           user_id: userId,
@@ -120,7 +143,7 @@ export class DatabaseService {
 
   static async getClioToken(userId: string): Promise<ClioToken | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('clio_tokens')
         .select('*')
         .eq('user_id', userId)
@@ -169,7 +192,7 @@ export class DatabaseService {
 
   static async deleteClioToken(userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('clio_tokens')
         .delete()
         .eq('user_id', userId);
@@ -179,6 +202,7 @@ export class DatabaseService {
         return false;
       }
 
+      console.log('✅ CLIO token deleted successfully for user:', userId);
       return true;
     } catch (error) {
       console.error('Database error deleting CLIO token:', error);
@@ -186,30 +210,40 @@ export class DatabaseService {
     }
   }
 
-  // Helper method to get or create a default user (for development)
-  static async getDefaultUser(): Promise<User | null> {
-    const defaultEmail = 'default@mdrxlaw.com';
-    
+  // Utility methods for debugging
+  static async getAllUsers(): Promise<User[]> {
     try {
-      console.log('🔍 Looking for default user:', defaultEmail);
-      let user = await this.getUserByEmail(defaultEmail);
-      
-      if (!user) {
-        console.log('👤 Creating default user...');
-        user = await this.createUser(defaultEmail, 'Default User');
-        if (user) {
-          console.log('✅ Default user created:', user.id);
-        } else {
-          console.error('❌ Failed to create default user');
-        }
-      } else {
-        console.log('✅ Found existing default user:', user.id);
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*');
+
+      if (error) {
+        console.error('Error getting all users:', error);
+        return [];
       }
-      
-      return user;
+
+      return data || [];
     } catch (error) {
-      console.error('Error in getDefaultUser:', error);
-      return null;
+      console.error('Database error getting all users:', error);
+      return [];
+    }
+  }
+
+  static async getAllTokens(): Promise<ClioToken[]> {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('clio_tokens')
+        .select('*');
+
+      if (error) {
+        console.error('Error getting all tokens:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Database error getting all tokens:', error);
+      return [];
     }
   }
 }
