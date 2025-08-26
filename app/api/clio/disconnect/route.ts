@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { tokenStorage } from '@/lib/token-storage';
+import { DatabaseService } from '@/lib/database';
 
 export async function POST() {
   try {
@@ -36,6 +37,18 @@ export async function POST() {
 
     // Clear the token from in-memory storage
     tokenStorage.removeToken('default');
+
+    // Also clear from database
+    try {
+      const defaultUser = await DatabaseService.getDefaultUser();
+      if (defaultUser) {
+        await DatabaseService.deleteClioToken(defaultUser.id);
+        console.log('✅ Token cleared from database');
+      }
+    } catch (dbError) {
+      console.error('Database error clearing token:', dbError);
+      // Continue even if database cleanup fails
+    }
 
     // In production, you would:
     // 1. Remove the tokens from your database

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { tokenStorage } from '@/lib/token-storage';
+import { DatabaseService } from '@/lib/database';
 
 export async function GET() {
   try {
@@ -15,8 +16,35 @@ export async function GET() {
       });
     }
 
-    // Check for stored access token (first try in-memory storage, then environment)
+    // Check for stored access token (try in-memory, then database, then environment)
     let accessToken = tokenStorage.getValidAccessToken('default');
+    
+    if (!accessToken) {
+      // Try database storage
+      try {
+        const defaultUser = await DatabaseService.getDefaultUser();
+        if (defaultUser) {
+          accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
+          
+          // If we found a valid token in database, also store it in memory for faster access
+          if (accessToken) {
+            const dbToken = await DatabaseService.getClioToken(defaultUser.id);
+            if (dbToken) {
+              tokenStorage.storeToken('default', {
+                access_token: dbToken.access_token,
+                refresh_token: dbToken.refresh_token || undefined,
+                expires_in: dbToken.expires_in,
+                token_type: dbToken.token_type,
+                scope: dbToken.scope,
+                created_at: new Date(dbToken.created_at).getTime()
+              });
+            }
+          }
+        }
+      } catch (dbError) {
+        console.error('Database error getting token:', dbError);
+      }
+    }
     
     if (!accessToken) {
       accessToken = process.env.CLIO_ACCESS_TOKEN || null;
@@ -31,6 +59,8 @@ export async function GET() {
 
     // Test the connection by making a request to CLIO API v4
     try {
+      console.log('Testing CLIO connection with token:', accessToken?.substring(0, 10) + '...');
+      
       const response = await fetch('https://app.clio.com/api/v4/users/who_am_i.json', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -38,6 +68,8 @@ export async function GET() {
           'X-CLIO-API-VERSION': '4'
         },
       });
+
+      console.log('CLIO API response status:', response.status);
 
       if (response.ok) {
         const responseData = await response.json();
@@ -51,7 +83,11 @@ export async function GET() {
             email: userData?.email || 'Unknown Email',
           }
         });
-      } else if (response.status === 401) {
+      } else if (response.status === 401 || response.status === 403) {
+        console.error('CLIO API authentication error:', response.status);
+        // Clear the invalid token from storage
+        tokenStorage.removeToken('default');
+        
         return NextResponse.json({
           isConnected: false,
           error: 'Access token expired or invalid. Please reconnect to CLIO.'

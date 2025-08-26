@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tokenStorage } from '@/lib/token-storage';
+import { DatabaseService } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Store the token in memory (for development)
+    // Store the token in memory (for development) and database (for production)
     tokenStorage.storeToken('default', {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
@@ -106,10 +107,40 @@ export async function GET(request: NextRequest) {
       created_at: Date.now()
     });
 
+    // Also store in database for persistence across serverless function restarts
+    try {
+      const defaultUser = await DatabaseService.getDefaultUser();
+      if (defaultUser) {
+        await DatabaseService.storeClioToken(
+          defaultUser.id,
+          tokenData.access_token,
+          tokenData.refresh_token,
+          tokenData.token_type || 'Bearer',
+          tokenData.expires_in || 3600,
+          tokenData.scope || ''
+        );
+        console.log('✅ Token also stored in database');
+      } else {
+        console.error('❌ Could not get/create default user for database storage');
+      }
+    } catch (dbError) {
+      console.error('Database storage error:', dbError);
+      // Continue even if database storage fails
+    }
+
     console.log('✅ Access token received and stored successfully');
     console.log('Token type:', tokenData.token_type);
     console.log('Expires in:', tokenData.expires_in, 'seconds');
     console.log('Scope:', tokenData.scope);
+    console.log('🔍 Verifying token storage...');
+    
+    // Verify the token was stored
+    const storedToken = tokenStorage.getValidAccessToken('default');
+    if (storedToken) {
+      console.log('✅ Token verified in storage');
+    } else {
+      console.error('❌ Token not found in storage after storing!');
+    }
     
     // For development, log the token (NEVER do this in production!)
     if (process.env.NODE_ENV === 'development') {
