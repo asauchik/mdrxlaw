@@ -18,6 +18,13 @@ export async function POST() {
     authUrl.searchParams.append('client_id', clioClientId);
     authUrl.searchParams.append('redirect_uri', clioRedirectUri);
     
+    // Debug logging
+    console.log('=== CLIO OAuth Debug ===');
+    console.log('Client ID:', clioClientId);
+    console.log('Redirect URI:', clioRedirectUri);
+    console.log('Full OAuth URL:', authUrl.toString());
+    console.log('========================');
+    
     // Request comprehensive scopes for legal practice management
     const scopes = [
       'read:user_profile',

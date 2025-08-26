@@ -46,27 +46,43 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Exchanging authorization code for access token...');
+    console.log('Using redirect URI:', clioRedirectUri);
+    console.log('Authorization code:', code?.substring(0, 10) + '...');
+
+    // CLIO expects form-encoded data, not JSON
+    const tokenParams = new URLSearchParams({
+      client_id: clioClientId,
+      client_secret: clioClientSecret,
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: clioRedirectUri,
+    });
 
     const tokenResponse = await fetch('https://app.clio.com/oauth/token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        client_id: clioClientId,
-        client_secret: clioClientSecret,
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: clioRedirectUri,
-      }),
+      body: tokenParams.toString(),
     });
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
-      console.error('Token exchange failed:', tokenResponse.status, errorData);
+      console.error('=== Token Exchange Failed ===');
+      console.error('Status:', tokenResponse.status);
+      console.error('Status Text:', tokenResponse.statusText);
+      console.error('Response:', errorData);
+      console.error('Request params:', {
+        client_id: clioClientId,
+        grant_type: 'authorization_code',
+        redirect_uri: clioRedirectUri,
+        code_length: code?.length
+      });
+      console.error('============================');
+      
       return NextResponse.redirect(
-        new URL('/?error=Token exchange failed', baseUrl)
+        new URL(`/?error=Token exchange failed: ${tokenResponse.status}`, baseUrl)
       );
     }
 
