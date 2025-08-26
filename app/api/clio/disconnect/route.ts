@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
+import { tokenStorage } from '@/lib/token-storage';
 
 export async function POST() {
   try {
-    const accessToken = process.env.CLIO_ACCESS_TOKEN;
+    // Try to get token from in-memory storage first
+    let accessToken = tokenStorage.getValidAccessToken('default');
+    
+    if (!accessToken) {
+      accessToken = process.env.CLIO_ACCESS_TOKEN || null;
+    }
 
     if (accessToken) {
       try {
@@ -27,6 +33,9 @@ export async function POST() {
         // Continue with local cleanup even if revocation fails
       }
     }
+
+    // Clear the token from in-memory storage
+    tokenStorage.removeToken('default');
 
     // In production, you would:
     // 1. Remove the tokens from your database

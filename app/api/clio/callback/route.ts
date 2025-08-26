@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { tokenStorage } from '@/lib/token-storage';
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,13 +96,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // In a production application, you would:
-    // 1. Store the access_token and refresh_token securely in your database
-    // 2. Associate them with the current user's session
-    // 3. Set up automatic token refresh using the refresh_token
-    // 4. Implement proper token storage with encryption
+    // Store the token in memory (for development)
+    tokenStorage.storeToken('default', {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_in: tokenData.expires_in || 3600, // Default to 1 hour if not provided
+      token_type: tokenData.token_type || 'Bearer',
+      scope: tokenData.scope || '',
+      created_at: Date.now()
+    });
 
-    console.log('✅ Access token received successfully');
+    console.log('✅ Access token received and stored successfully');
     console.log('Token type:', tokenData.token_type);
     console.log('Expires in:', tokenData.expires_in, 'seconds');
     console.log('Scope:', tokenData.scope);

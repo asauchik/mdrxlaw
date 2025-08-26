@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { tokenStorage } from '@/lib/token-storage';
 
 export async function GET() {
   try {
@@ -14,8 +15,12 @@ export async function GET() {
       });
     }
 
-    // Check for stored access token
-    const accessToken = process.env.CLIO_ACCESS_TOKEN;
+    // Check for stored access token (first try in-memory storage, then environment)
+    let accessToken = tokenStorage.getValidAccessToken('default');
+    
+    if (!accessToken) {
+      accessToken = process.env.CLIO_ACCESS_TOKEN || null;
+    }
     
     if (!accessToken) {
       return NextResponse.json({
