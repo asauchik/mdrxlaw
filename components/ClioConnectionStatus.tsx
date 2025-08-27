@@ -24,7 +24,7 @@ export default function ClioConnectionStatus() {
       
       try {
         setLoading(true);
-        const response = await fetch('/api/clio/status', {
+        const response = await fetch(`/api/clio/status?user_id=${user.id}`, {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
@@ -50,7 +50,7 @@ export default function ClioConnectionStatus() {
     
     try {
       setLoading(true);
-      const response = await fetch('/api/clio/status', {
+      const response = await fetch(`/api/clio/status?user_id=${user.id}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
@@ -73,13 +73,13 @@ export default function ClioConnectionStatus() {
     
     try {
       setLoading(true);
-      const response = await fetch('/api/clio/connect', { 
+      const response = await fetch('/api/clio/auth', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ userId: user.id })
+        body: JSON.stringify({ user_id: user.id })
       });
       
       if (!response.ok) {
@@ -89,10 +89,10 @@ export default function ClioConnectionStatus() {
       
       const data = await response.json();
       
-      if (data.authUrl) {
+      if (data.url) {
         console.log('🔗 Redirecting to CLIO for authorization...');
         // Open CLIO authorization in the same window
-        window.location.href = data.authUrl;
+        window.location.href = data.url;
       } else {
         throw new Error('No authorization URL received');
       }

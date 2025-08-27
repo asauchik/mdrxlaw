@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     if (error || !tokenRow) {
       return NextResponse.json({ 
-        connected: false, 
+        isConnected: false, 
         error: 'No token found' 
       });
     }
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     
     if (now >= expiresAt) {
       return NextResponse.json({ 
-        connected: false, 
+        isConnected: false, 
         error: 'Token expired',
         expires_at: tokenRow.expires_at
       });
@@ -54,8 +54,12 @@ export async function GET(request: NextRequest) {
     if (testResponse.ok) {
       const userData = await testResponse.json();
       return NextResponse.json({
-        connected: true,
+        isConnected: true,
         user: userData.data,
+        accountInfo: {
+          name: userData.data?.name || 'Unknown User',
+          email: userData.data?.email || 'Unknown Email'
+        },
         token_info: {
           scope: tokenRow.scope,
           expires_at: tokenRow.expires_at,
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
       console.error('CLIO API error:', testResponse.status, errorText);
       
       return NextResponse.json({
-        connected: false,
+        isConnected: false,
         error: `CLIO API returned ${testResponse.status}`,
         details: errorText
       });
@@ -76,7 +80,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Status check error:', error);
     return NextResponse.json({ 
-      connected: false, 
+      isConnected: false, 
       error: 'Internal error' 
     }, { status: 500 });
   }
