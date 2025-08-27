@@ -41,11 +41,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Test token with CLIO API
-    const testResponse = await fetch('https://app.clio.com/api/v4/users/who_am_i.json', {
+    // Test token with CLIO API - Using correct header and endpoint
+    const testResponse = await fetch('https://app.clio.com/api/v4/users/who_am_i', {
       headers: {
         'Authorization': `Bearer ${tokenRow.access_token}`,
-        'X-CLIO-API-VERSION': '4'
+        'X-API-VERSION': '4.0.10'  // Correct header name and latest version
       }
     });
 
@@ -70,10 +70,34 @@ export async function GET(request: NextRequest) {
       const errorText = await testResponse.text();
       console.error('CLIO API error:', testResponse.status, errorText);
       
+      let detailedError = `CLIO API returned ${testResponse.status}`;
+      let troubleshooting = '';
+      
+      if (testResponse.status === 403) {
+        detailedError = 'CLIO API returned 403 Forbidden - Access Denied';
+        troubleshooting = `
+Common causes of 403 errors:
+• App not approved for production use in CLIO Developer Console
+• Incorrect scopes (we're using: ${tokenRow.scope})
+• App permissions not properly configured
+• Wrong CLIO environment (production vs sandbox)
+• Redirect URI mismatch in app settings
+
+To resolve:
+1. Check your CLIO Developer Console app settings
+2. Verify app is approved for production use
+3. Confirm redirect URI exactly matches: ${process.env.CLIO_REDIRECT_URI}
+4. Contact CLIO support if permissions are unclear
+        `;
+      }
+      
       return NextResponse.json({
         isConnected: false,
-        error: `CLIO API returned ${testResponse.status}`,
-        details: errorText
+        error: detailedError,
+        troubleshooting: troubleshooting.trim(),
+        details: errorText,
+        scope_used: tokenRow.scope,
+        token_prefix: tokenRow.access_token.substring(0, 10) + '...'
       });
     }
 
