@@ -81,6 +81,7 @@ export class DatabaseService {
       });
       
       // First, delete any existing tokens for this user
+      console.log('🗑️ Deleting existing tokens...');
       const { error: deleteError } = await supabaseAdmin
         .from('clio_tokens')
         .delete()
@@ -88,31 +89,65 @@ export class DatabaseService {
 
       if (deleteError) {
         console.warn('Warning deleting existing tokens:', deleteError.message);
+      } else {
+        console.log('✅ Successfully deleted existing tokens (if any)');
       }
 
       // Insert the new token
+      console.log('💾 Inserting new token...');
+      const tokenData = {
+        user_id: userId,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_type: tokenType,
+        expires_in: expiresIn,
+        scope: scope
+      };
+      console.log('📋 Token data to insert:', {
+        user_id: userId,
+        has_access_token: !!accessToken,
+        has_refresh_token: !!refreshToken,
+        token_type: tokenType,
+        expires_in: expiresIn,
+        scope: scope
+      });
+      
+      // Let's check if the user actually exists first using admin auth
+      console.log('🔍 Verifying user exists in auth system...');
+      try {
+        const { data: userCheck, error: userCheckError } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (userCheckError || !userCheck.user) {
+          console.error('❌ User verification failed:', userCheckError);
+          console.error('User ID being checked:', userId);
+          return null;
+        }
+        console.log('✅ User verified:', userCheck.user.email);
+      } catch (userError) {
+        console.error('❌ Error verifying user:', userError);
+        return null;
+      }
+      
       const { data, error } = await supabaseAdmin
         .from('clio_tokens')
-        .insert([{
-          user_id: userId,
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          token_type: tokenType,
-          expires_in: expiresIn,
-          scope: scope
-        }])
+        .insert([tokenData])
         .select()
         .single();
 
       if (error) {
-        console.error('Error storing CLIO token:', error);
+        console.error('❌ Error storing CLIO token:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         return null;
       }
 
       console.log('✅ CLIO token stored successfully:', data.id);
       return data;
     } catch (error) {
-      console.error('Database error storing CLIO token:', error);
+      console.error('💥 Database error storing CLIO token:', error);
       return null;
     }
   }

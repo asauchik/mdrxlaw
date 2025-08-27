@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +38,23 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Processing OAuth callback for user:', userId);
+
+    // Verify that this user ID exists in the auth.users table
+    try {
+      const { data: authUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (userError || !authUser.user) {
+        console.error('❌ Invalid user ID in OAuth state:', userId, userError);
+        return NextResponse.redirect(
+          new URL('/?error=Invalid user authentication', baseUrl)
+        );
+      }
+      console.log('✅ Verified user exists:', authUser.user.email);
+    } catch (userVerifyError) {
+      console.error('❌ Failed to verify user:', userVerifyError);
+      return NextResponse.redirect(
+        new URL('/?error=User verification failed', baseUrl)
+      );
+    }
 
     // Exchange code for access token
     const clioClientId = process.env.CLIO_CLIENT_ID;
