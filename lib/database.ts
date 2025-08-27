@@ -80,37 +80,13 @@ export class DatabaseService {
         accessTokenLength: accessToken?.length
       });
       
-      // First, delete any existing tokens for this user
-      console.log('🗑️ Deleting existing tokens...');
-      const { error: deleteError } = await supabaseAdmin
-        .from('clio_tokens')
-        .delete()
-        .eq('user_id', userId);
-
-      if (deleteError) {
-        console.warn('Warning deleting existing tokens:', deleteError.message);
-      } else {
-        console.log('✅ Successfully deleted existing tokens (if any)');
+      if (!accessToken || accessToken.trim().length < 20) {
+        console.error('❌ Refusing to store invalid / empty access token');
+        return null;
       }
 
-      // Insert the new token
-      console.log('💾 Inserting new token...');
-      const tokenData = {
-        user_id: userId,
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        token_type: tokenType,
-        expires_in: expiresIn,
-        scope: scope
-      };
-      console.log('📋 Token data to insert:', {
-        user_id: userId,
-        has_access_token: !!accessToken,
-        has_refresh_token: !!refreshToken,
-        token_type: tokenType,
-        expires_in: expiresIn,
-        scope: scope
-      });
+      // Upsert via SQL function (atomic, avoids race condition + delete window)
+      console.log('� Upserting token via function upsert_clio_token');
       
       // Let's check if the user actually exists first using admin auth
       console.log('🔍 Verifying user exists in auth system...');
@@ -126,12 +102,16 @@ export class DatabaseService {
         console.error('❌ Error verifying user:', userError);
         return null;
       }
-      
+      // Call the SQL function
       const { data, error } = await supabaseAdmin
-        .from('clio_tokens')
-        .insert([tokenData])
-        .select()
-        .single();
+        .rpc('upsert_clio_token', {
+          p_user_id: userId,
+            p_access_token: accessToken,
+            p_refresh_token: refreshToken || null,
+            p_token_type: tokenType,
+            p_expires_in: expiresIn,
+            p_scope: scope
+        });
 
       if (error) {
         console.error('❌ Error storing CLIO token:', error);
@@ -143,9 +123,13 @@ export class DatabaseService {
         });
         return null;
       }
-
-      console.log('✅ CLIO token stored successfully:', data.id);
-      return data;
+      const stored = Array.isArray(data) ? data[0] : data; // rpc can return row or array depending on config
+      if (!stored) {
+        console.error('❌ Upsert function returned no row');
+        return null;
+      }
+      console.log('✅ CLIO token stored successfully (upsert):', stored.id);
+      return stored as ClioToken;
     } catch (error) {
       console.error('💥 Database error storing CLIO token:', error);
       return null;

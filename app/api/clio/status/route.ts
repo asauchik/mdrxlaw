@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
       console.log('CLIO API response status:', response.status);
 
-      if (response.ok) {
+  if (response.ok) {
         const responseData = await response.json();
         const userData = responseData.data;
         
@@ -81,18 +81,11 @@ export async function GET(request: NextRequest) {
         });
       } else if (response.status === 401 || response.status === 403) {
         console.error('CLIO API authentication error:', response.status);
-        
-        // Clear the invalid token from database
-        try {
-          await DatabaseService.deleteClioToken(user.id);
-          console.log('🗑️ Cleared invalid token from database');
-        } catch (clearError) {
-          console.error('Error clearing invalid token:', clearError);
-        }
-        
+        // Do NOT delete immediately; surface diagnostic so we can implement refresh path later
         return NextResponse.json({
           isConnected: false,
-          error: 'Access token expired or invalid. Please reconnect to CLIO.'
+          error: 'CLIO token rejected (401/403). Pending refresh implementation.',
+          needsReauth: true
         });
       } else {
         const errorData = await response.text();
