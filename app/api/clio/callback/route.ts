@@ -114,6 +114,13 @@ export async function GET(request: NextRequest) {
     
     try {
       console.log('🗄️ Storing token in database for user:', userId);
+      console.log('Token data received:', {
+        hasAccessToken: !!tokenData.access_token,
+        hasRefreshToken: !!tokenData.refresh_token,
+        tokenType: tokenData.token_type,
+        expiresIn,
+        scope: tokenData.scope
+      });
       
       // Store token directly using the authenticated user ID
       const storedToken = await DatabaseService.storeClioToken(
@@ -128,13 +135,18 @@ export async function GET(request: NextRequest) {
       if (storedToken) {
         console.log('✅ Token stored in database successfully:', storedToken.id);
       } else {
-        console.error('❌ Failed to store token in database');
+        console.error('❌ Failed to store token in database - storeClioToken returned null');
         return NextResponse.redirect(
           new URL('/?error=Token storage failed', baseUrl)
         );
       }
     } catch (dbError) {
       console.error('Database storage error:', dbError);
+      console.error('Error details:', {
+        message: dbError instanceof Error ? dbError.message : 'Unknown error',
+        userId,
+        tokenDataKeys: Object.keys(tokenData)
+      });
       return NextResponse.redirect(
         new URL('/?error=Database error', baseUrl)
       );
