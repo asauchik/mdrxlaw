@@ -44,8 +44,17 @@ export async function GET(request: NextRequest) {
       const { data: authUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
       if (userError || !authUser.user) {
         console.error('❌ Invalid user ID in OAuth state:', userId, userError);
+        console.error('❌ User verification details:', {
+          userId,
+          userError: userError ? {
+            message: userError.message,
+            code: userError.code
+          } : null,
+          hasAuthUser: !!authUser,
+          hasUser: !!(authUser && authUser.user)
+        });
         return NextResponse.redirect(
-          new URL('/?error=Invalid user authentication', baseUrl)
+          new URL(`/?error=Invalid user authentication - User ID: ${userId.substring(0, 8)}...`, baseUrl)
         );
       }
       console.log('✅ Verified user exists:', authUser.user.email);
