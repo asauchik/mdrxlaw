@@ -5,7 +5,7 @@ export async function GET() {
   try {
     console.log('🔍 Testing direct database connectivity...');
     
-    const results: Record<string, any> = {};
+    const results: Record<string, unknown> = {};
     
     // Test 1: Check connection
     console.log('Test 1: Checking database connection...');
