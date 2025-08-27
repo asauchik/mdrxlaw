@@ -47,21 +47,20 @@ export async function POST(request: NextRequest) {
     console.log('Full OAuth URL:', authUrl.toString());
     console.log('========================');
     
-    // Scopes: Allow override via env var CLIO_SCOPES for rapid iteration without redeploying code.
-    // NOTE: Prior format used `read:contacts` which appears invalid for CLIO; CLIO commonly uses dot notation
-    // like `contacts.read`. We include offline_access to receive a refresh_token.
+    // CLIO v2 integration: Use colon-style scopes per official docs (e.g., read:users, write:activities, etc.).
+    // Include offline_access to receive a refresh_token. Allow override via CLIO_SCOPES env.
     const defaultScopes = [
-      'profile.read', // for who_am_i
-      'contacts.read',
-      'matters.read',
-      'documents.read',
-      'activities.read',
-      'calendar_entries.read',
-      'communications.read',
-      'custom_fields.read',
+      'read:users', // needed for who_am_i
+      'read:contacts',
+      'read:matters',
+      'read:documents',
+      'read:activities',
+      'read:calendar_entries',
+      'read:communications',
+      'read:custom_fields',
       'offline_access'
     ];
-    const scopes = (process.env.CLIO_SCOPES?.trim() || defaultScopes.join(' '));
+    const scopes = (process.env.CLIO_SCOPES?.trim()) || defaultScopes.join(' ');
 
     authUrl.searchParams.append('scope', scopes);
     console.log('Requested CLIO scopes:', scopes);
