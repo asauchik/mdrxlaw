@@ -1,6 +1,7 @@
 'use client';
 
 import ClioConnectionStatus from '@/components/ClioConnectionStatus';
+import ClioTest from '@/components/ClioTest';
 import AuthForm from '@/components/AuthForm';
 import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -99,6 +100,12 @@ function HomeContent() {
             </h2>
             
             <ClioConnectionStatus />
+            
+            {/* Debug Test Component */}
+            <div className="mt-8 border-t pt-8">
+              <h3 className="text-lg font-semibold mb-4">Debug Test</h3>
+              <ClioTest />
+            </div>
           </div>
         </div>
 
