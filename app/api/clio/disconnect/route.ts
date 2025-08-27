@@ -1,21 +1,32 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Get user email from request body
+    const body = await request.json();
+    const userEmail = body.userEmail;
+    
+    if (!userEmail) {
+      return NextResponse.json({
+        error: 'User email is required'
+      }, { status: 400 });
+    }
+
     // Try to get token from database first for revocation
     let accessToken = null;
+    let user = null;
     
     try {
-      const defaultUser = await DatabaseService.getDefaultUser();
-      if (defaultUser) {
-        accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
+      user = await DatabaseService.getUserByEmail(userEmail);
+      if (user) {
+        accessToken = await DatabaseService.getValidClioToken(user.id);
       }
     } catch (dbError) {
       console.error('Database error getting token for revocation:', dbError);
     }
 
-    if (accessToken) {
+    if (accessToken && user) {
       try {
         // Revoke the token with CLIO using their API
         const revokeResponse = await fetch('https://app.clio.com/oauth/deauthorize', {
@@ -41,10 +52,9 @@ export async function POST() {
 
     // Clear the token from database
     try {
-      const defaultUser = await DatabaseService.getDefaultUser();
-      if (defaultUser) {
-        await DatabaseService.deleteClioToken(defaultUser.id);
-        console.log('✅ Token cleared from database');
+      if (user) {
+        await DatabaseService.deleteClioToken(user.id);
+        console.log('✅ Token cleared from database for user:', userEmail);
       }
     } catch (dbError) {
       console.error('Database error clearing token:', dbError);

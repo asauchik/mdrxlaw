@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 interface ClioStatus {
   isConnected: boolean;
@@ -13,17 +14,39 @@ interface ClioStatus {
 }
 
 export default function ClioConnectionStatus() {
+  const { user } = useAuth();
   const [status, setStatus] = useState<ClioStatus>({ isConnected: false });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkClioConnection();
-  }, []);
+    const checkConnection = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/clio/status?userEmail=${encodeURIComponent(user.email || '')}`);
+        const data = await response.json();
+        setStatus(data);
+      } catch (err) {
+        console.error('Connection check failed:', err);
+        setStatus({ 
+          isConnected: false, 
+          error: 'Failed to check connection status' 
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkConnection();
+  }, [user]);
 
   const checkClioConnection = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
-      const response = await fetch('/api/clio/status');
+      const response = await fetch(`/api/clio/status?userEmail=${encodeURIComponent(user.email || '')}`);
       const data = await response.json();
       setStatus(data);
     } catch (err) {
@@ -38,9 +61,17 @@ export default function ClioConnectionStatus() {
   };
 
   const connectToClio = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
-      const response = await fetch('/api/clio/connect', { method: 'POST' });
+      const response = await fetch('/api/clio/connect', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userEmail: user.email })
+      });
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -67,9 +98,17 @@ export default function ClioConnectionStatus() {
   };
 
   const disconnectFromClio = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
-      const response = await fetch('/api/clio/disconnect', { method: 'POST' });
+      const response = await fetch('/api/clio/disconnect', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userEmail: user.email })
+      });
       
       if (!response.ok) {
         const errorData = await response.json();

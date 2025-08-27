@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
-    const state = searchParams.get('state');
+    const state = searchParams.get('state'); // This should be the user email
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
@@ -27,13 +27,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // In production, verify the state parameter for CSRF protection
-    if (state) {
-      console.log('Received OAuth state:', state);
-      // TODO: Verify state matches what was stored in session
-    } else {
-      console.warn('No state parameter received in OAuth callback');
+    // Get user email from state parameter
+    const userEmail = state;
+    if (!userEmail) {
+      console.error('No user email in state parameter');
+      return NextResponse.redirect(
+        new URL('/?error=User authentication error', baseUrl)
+      );
     }
+
+    console.log('Processing OAuth callback for user:', userEmail);
 
     // Exchange code for access token
     const clioClientId = process.env.CLIO_CLIENT_ID;
@@ -110,12 +113,18 @@ export async function GET(request: NextRequest) {
     const expiresIn = tokenData.expires_in || 604800;
     
     try {
-      console.log('🗄️ Storing token in database...');
-      const defaultUser = await DatabaseService.getDefaultUser();
-      if (defaultUser) {
-        console.log('👤 Found default user:', defaultUser.id);
+      console.log('🗄️ Storing token in database for user:', userEmail);
+      
+      // Get or create user by email
+      let user = await DatabaseService.getUserByEmail(userEmail);
+      if (!user) {
+        user = await DatabaseService.createUser(userEmail);
+      }
+      
+      if (user) {
+        console.log('👤 Found/created user:', user.id);
         const storedToken = await DatabaseService.storeClioToken(
-          defaultUser.id,
+          user.id,
           tokenData.access_token,
           tokenData.refresh_token,
           tokenData.token_type || 'Bearer',
@@ -132,7 +141,7 @@ export async function GET(request: NextRequest) {
           );
         }
       } else {
-        console.error('❌ Could not get/create default user for database storage');
+        console.error('❌ Could not get/create user for database storage');
         return NextResponse.redirect(
           new URL('/?error=User setup failed', baseUrl)
         );

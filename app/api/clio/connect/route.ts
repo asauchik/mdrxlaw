@@ -1,8 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Get user email from request body
+    const body = await request.json();
+    const userEmail = body.userEmail;
+    
+    if (!userEmail) {
+      return NextResponse.json({
+        error: 'User email is required'
+      }, { status: 400 });
+    }
+
     const clioClientId = process.env.CLIO_CLIENT_ID;
     const clioRedirectUri = process.env.CLIO_REDIRECT_URI;
 
@@ -18,10 +28,14 @@ export async function POST() {
     authUrl.searchParams.append('client_id', clioClientId);
     authUrl.searchParams.append('redirect_uri', clioRedirectUri);
     
+    // Add user email as state parameter to track which user is authenticating
+    authUrl.searchParams.append('state', userEmail);
+    
     // Debug logging
     console.log('=== CLIO OAuth Debug ===');
     console.log('Client ID:', clioClientId);
     console.log('Redirect URI:', clioRedirectUri);
+    console.log('User Email:', userEmail);
     console.log('Full OAuth URL:', authUrl.toString());
     console.log('========================');
     

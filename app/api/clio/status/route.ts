@@ -1,8 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Get user email from query parameters
+    const url = new URL(request.url);
+    const userEmail = url.searchParams.get('userEmail');
+    
+    if (!userEmail) {
+      return NextResponse.json({
+        isConnected: false,
+        error: 'User email is required'
+      });
+    }
+
     // Check for CLIO environment variables
     const clioClientId = process.env.CLIO_CLIENT_ID;
     const clioClientSecret = process.env.CLIO_CLIENT_SECRET;
@@ -15,19 +26,27 @@ export async function GET() {
       });
     }
 
-    // Check for stored access token (database only - no in-memory storage in serverless)
+    // Check for stored access token for this user
     let accessToken = null;
-    console.log('🗄️ Checking database for token...');
+    console.log('🗄️ Checking database for token for user:', userEmail);
     
     try {
-      const defaultUser = await DatabaseService.getDefaultUser();
-      if (defaultUser) {
-        console.log('👤 Found default user:', defaultUser.id);
-        accessToken = await DatabaseService.getValidClioToken(defaultUser.id);
-        console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
-      } else {
-        console.log('❌ No default user found in database');
+      // Get or create user by email
+      let user = await DatabaseService.getUserByEmail(userEmail);
+      if (!user) {
+        // Create user if they don't exist
+        user = await DatabaseService.createUser(userEmail);
+        if (!user) {
+          return NextResponse.json({
+            isConnected: false,
+            error: 'Failed to create user record'
+          });
+        }
       }
+      
+      console.log('👤 Found/created user:', user.id);
+      accessToken = await DatabaseService.getValidClioToken(user.id);
+      console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
     } catch (dbError) {
       console.error('Database error getting token:', dbError);
     }

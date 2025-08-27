@@ -1,10 +1,13 @@
 'use client';
 
 import ClioConnectionStatus from '@/components/ClioConnectionStatus';
+import AuthForm from '@/components/AuthForm';
+import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 
 function HomeContent() {
+  const { user, loading } = useAuth();
   const searchParams = useSearchParams();
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
 
@@ -30,14 +33,48 @@ function HomeContent() {
     }
   }, [searchParams]);
 
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth form if user is not logged in
+  if (!user) {
+    return <AuthForm />;
+  }
+
+  // Show main app if user is authenticated
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <main className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header with user info */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            MDRXLaw
-          </h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-4xl font-bold text-gray-900">
+              MDRXLaw
+            </h1>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                Welcome, {user.email}
+              </span>
+              <button
+                onClick={() => {
+                  // Import and use signOut function
+                  import('@/lib/auth').then(({ signOut }) => signOut());
+                }}
+                className="text-sm text-red-600 hover:text-red-800"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Legal Practice Management with CLIO Integration
           </p>
