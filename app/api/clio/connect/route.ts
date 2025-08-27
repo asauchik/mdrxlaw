@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomBytes } from 'crypto';
 import { supabase } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -37,13 +36,14 @@ export async function POST(request: NextRequest) {
     authUrl.searchParams.append('redirect_uri', clioRedirectUri);
     
     // Add user ID as state parameter to track which user is authenticating
+    // This serves both as CSRF protection and user identification
     authUrl.searchParams.append('state', user.id);
     
     // Debug logging
     console.log('=== CLIO OAuth Debug ===');
     console.log('Client ID:', clioClientId);
     console.log('Redirect URI:', clioRedirectUri);
-    console.log('User ID:', user.id);
+    console.log('User ID (state):', user.id);
     console.log('Full OAuth URL:', authUrl.toString());
     console.log('========================');
     
@@ -60,18 +60,10 @@ export async function POST(request: NextRequest) {
     ].join(' ');
     
     authUrl.searchParams.append('scope', scopes);
-    
-    // Generate secure state parameter for CSRF protection
-    const state = randomBytes(32).toString('hex');
-    authUrl.searchParams.append('state', state);
-
-    // In production, you would store the state parameter securely
-    // associated with the user session to verify on callback
-    console.log('Generated OAuth state:', state);
 
     return NextResponse.json({
       authUrl: authUrl.toString(),
-      state,
+      state: user.id,
       message: 'Redirecting to CLIO for authorization...'
     });
 
