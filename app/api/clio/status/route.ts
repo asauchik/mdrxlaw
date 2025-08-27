@@ -81,10 +81,41 @@ export async function GET(request: NextRequest) {
         });
       } else if (response.status === 401 || response.status === 403) {
         console.error('CLIO API authentication error:', response.status);
-        // Do NOT delete immediately; surface diagnostic so we can implement refresh path later
+        // Try refresh once
+        try {
+          const refreshed = await DatabaseService.refreshClioToken(user.id);
+          if (refreshed) {
+            console.log('🔄 Retrying CLIO who_am_i after refresh');
+            const retry = await fetch('https://app.clio.com/api/v4/users/who_am_i.json', {
+              headers: {
+                'Authorization': `Bearer ${refreshed.access_token}`,
+                'Content-Type': 'application/json',
+                'X-CLIO-API-VERSION': '4'
+              },
+            });
+            if (retry.ok) {
+              const retryData = await retry.json();
+              const u = retryData.data;
+              return NextResponse.json({
+                isConnected: true,
+                lastSync: new Date().toISOString(),
+                accountInfo: {
+                  name: u?.name || 'Unknown User',
+                  email: u?.email || 'Unknown Email'
+                },
+                refreshed: true
+              });
+            }
+            console.error('Retry after refresh failed:', retry.status);
+          } else {
+            console.warn('Refresh attempt failed or not possible');
+          }
+        } catch (refreshErr) {
+          console.error('Refresh process error:', refreshErr);
+        }
         return NextResponse.json({
           isConnected: false,
-          error: 'CLIO token rejected (401/403). Pending refresh implementation.',
+          error: 'CLIO token rejected after refresh attempt. Please reconnect.',
           needsReauth: true
         });
       } else {

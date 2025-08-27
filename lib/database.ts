@@ -159,8 +159,89 @@ export class DatabaseService {
   }
 
   static async isTokenExpired(token: ClioToken): Promise<boolean> {
-    const expiresAt = new Date(token.created_at).getTime() + (token.expires_in * 1000);
+    // Add a 60s safety skew so we refresh slightly before true expiry
+    const expiresAt = new Date(token.created_at).getTime() + (token.expires_in * 1000) - 60_000;
     return Date.now() > expiresAt;
+  }
+
+  /**
+   * Attempt to refresh a CLIO token using stored refresh_token.
+   * Returns updated token row or null.
+   */
+  static async refreshClioToken(userId: string): Promise<ClioToken | null> {
+    try {
+      const current = await this.getClioToken(userId);
+      if (!current) {
+        console.warn('No existing token to refresh for user', userId);
+        return null;
+      }
+      if (!current.refresh_token) {
+        console.warn('No refresh_token present for user', userId);
+        return null;
+      }
+
+      const clientId = process.env.CLIO_CLIENT_ID;
+      const clientSecret = process.env.CLIO_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        console.error('Missing CLIO client credentials for refresh');
+        return null;
+      }
+
+      console.log('🔄 Refreshing CLIO token for user:', userId);
+      const params = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: current.refresh_token
+      });
+
+      const resp = await fetch('https://app.clio.com/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        body: params.toString()
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error('❌ CLIO refresh failed:', resp.status, text);
+        return null;
+      }
+
+      interface ClioRefreshResponse {
+        access_token?: string;
+        refresh_token?: string;
+        token_type?: string;
+        expires_in?: number;
+        scope?: string;
+        error?: string;
+        error_description?: string;
+        [k: string]: unknown;
+      }
+      const json: ClioRefreshResponse = await resp.json();
+      if (!json.access_token) {
+        console.error('❌ Refresh response missing access_token', json);
+        return null;
+      }
+
+      const updated = await this.storeClioToken(
+        userId,
+        json.access_token,
+        json.refresh_token || current.refresh_token, // some providers rotate refresh tokens
+        json.token_type || 'Bearer',
+        json.expires_in || 604800,
+        json.scope || current.scope || ''
+      );
+      if (updated) {
+        console.log('✅ CLIO token refreshed for user:', userId);
+      }
+      return updated;
+    } catch (err) {
+      console.error('💥 Error refreshing CLIO token:', err);
+      return null;
+    }
   }
 
   static async getValidClioToken(userId: string): Promise<string | null> {
