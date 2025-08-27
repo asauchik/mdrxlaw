@@ -35,13 +35,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Check for stored access token for this user
-    let accessToken = null;
+  // Check for stored access token for this user
+  let accessToken = null;
     console.log('🗄️ Checking database for token for user:', user.id);
     
     try {
-      accessToken = await DatabaseService.getValidClioToken(user.id);
-      console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
+  accessToken = await DatabaseService.getValidClioToken(user.id);
+  console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
     } catch (dbError) {
       console.error('Database error getting token:', dbError);
     }
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Test the connection by making a request to CLIO API v4
     try {
-      console.log('Testing CLIO connection with token:', accessToken?.substring(0, 10) + '...');
+  console.log('Testing CLIO connection with token prefix:', accessToken?.substring(0, 10) + '...');
       
       const response = await fetch('https://app.clio.com/api/v4/users/who_am_i.json', {
         headers: {
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
           }
         });
       } else if (response.status === 401 || response.status === 403) {
-        console.error('CLIO API authentication error:', response.status);
+  console.error('CLIO API authentication error:', response.status);
         // Try refresh once
         try {
           const refreshed = await DatabaseService.refreshClioToken(user.id);
@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           isConnected: false,
           error: 'CLIO token rejected after refresh attempt. Please reconnect.',
+          hint: 'Likely invalid scopes, revoked consent, or refresh token missing. Ensure offline_access scope and correct scope format (e.g., contacts.read).',
           needsReauth: true
         });
       } else {

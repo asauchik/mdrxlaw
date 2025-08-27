@@ -47,19 +47,24 @@ export async function POST(request: NextRequest) {
     console.log('Full OAuth URL:', authUrl.toString());
     console.log('========================');
     
-    // Request comprehensive scopes for legal practice management
-    const scopes = [
-      'read:user_profile',
-      'read:contacts',
-      'read:matters',
-      'read:documents',
-      'read:activities',
-      'read:calendar_entries',
-      'read:communications',
-      'read:custom_fields'
-    ].join(' ');
-    
+    // Scopes: Allow override via env var CLIO_SCOPES for rapid iteration without redeploying code.
+    // NOTE: Prior format used `read:contacts` which appears invalid for CLIO; CLIO commonly uses dot notation
+    // like `contacts.read`. We include offline_access to receive a refresh_token.
+    const defaultScopes = [
+      'profile.read', // for who_am_i
+      'contacts.read',
+      'matters.read',
+      'documents.read',
+      'activities.read',
+      'calendar_entries.read',
+      'communications.read',
+      'custom_fields.read',
+      'offline_access'
+    ];
+    const scopes = (process.env.CLIO_SCOPES?.trim() || defaultScopes.join(' '));
+
     authUrl.searchParams.append('scope', scopes);
+    console.log('Requested CLIO scopes:', scopes);
 
     return NextResponse.json({
       authUrl: authUrl.toString(),
