@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
-    const state = searchParams.get('state'); // This should be the user email
+    const state = searchParams.get('state'); // This should be the user ID
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
@@ -27,16 +27,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user email from state parameter
-    const userEmail = state;
-    if (!userEmail) {
-      console.error('No user email in state parameter');
+    // Get user ID from state parameter
+    const userId = state;
+    if (!userId) {
+      console.error('No user ID in state parameter');
       return NextResponse.redirect(
         new URL('/?error=User authentication error', baseUrl)
       );
     }
 
-    console.log('Processing OAuth callback for user:', userEmail);
+    console.log('Processing OAuth callback for user:', userId);
 
     // Exchange code for access token
     const clioClientId = process.env.CLIO_CLIENT_ID;
@@ -113,37 +113,24 @@ export async function GET(request: NextRequest) {
     const expiresIn = tokenData.expires_in || 604800;
     
     try {
-      console.log('🗄️ Storing token in database for user:', userEmail);
+      console.log('🗄️ Storing token in database for user:', userId);
       
-      // Get or create user by email
-      let user = await DatabaseService.getUserByEmail(userEmail);
-      if (!user) {
-        user = await DatabaseService.createUser(userEmail);
-      }
+      // Store token directly using the authenticated user ID
+      const storedToken = await DatabaseService.storeClioToken(
+        userId,
+        tokenData.access_token,
+        tokenData.refresh_token,
+        tokenData.token_type || 'Bearer',
+        expiresIn,
+        tokenData.scope || ''
+      );
       
-      if (user) {
-        console.log('👤 Found/created user:', user.id);
-        const storedToken = await DatabaseService.storeClioToken(
-          user.id,
-          tokenData.access_token,
-          tokenData.refresh_token,
-          tokenData.token_type || 'Bearer',
-          expiresIn,
-          tokenData.scope || ''
-        );
-        
-        if (storedToken) {
-          console.log('✅ Token stored in database successfully:', storedToken.id);
-        } else {
-          console.error('❌ Failed to store token in database');
-          return NextResponse.redirect(
-            new URL('/?error=Token storage failed', baseUrl)
-          );
-        }
+      if (storedToken) {
+        console.log('✅ Token stored in database successfully:', storedToken.id);
       } else {
-        console.error('❌ Could not get/create user for database storage');
+        console.error('❌ Failed to store token in database');
         return NextResponse.redirect(
-          new URL('/?error=User setup failed', baseUrl)
+          new URL('/?error=Token storage failed', baseUrl)
         );
       }
     } catch (dbError) {

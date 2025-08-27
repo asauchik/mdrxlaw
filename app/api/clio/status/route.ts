@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
+import { supabase } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user email from query parameters
-    const url = new URL(request.url);
-    const userEmail = url.searchParams.get('userEmail');
-    
-    if (!userEmail) {
+    // Get user from session
+    const authorization = request.headers.get('authorization');
+    if (!authorization) {
       return NextResponse.json({
         isConnected: false,
-        error: 'User email is required'
-      });
+        error: 'Authorization required'
+      }, { status: 401 });
+    }
+
+    const token = authorization.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json({
+        isConnected: false,
+        error: 'Invalid authentication'
+      }, { status: 401 });
     }
 
     // Check for CLIO environment variables
@@ -28,23 +37,9 @@ export async function GET(request: NextRequest) {
 
     // Check for stored access token for this user
     let accessToken = null;
-    console.log('🗄️ Checking database for token for user:', userEmail);
+    console.log('🗄️ Checking database for token for user:', user.id);
     
     try {
-      // Get or create user by email
-      let user = await DatabaseService.getUserByEmail(userEmail);
-      if (!user) {
-        // Create user if they don't exist
-        user = await DatabaseService.createUser(userEmail);
-        if (!user) {
-          return NextResponse.json({
-            isConnected: false,
-            error: 'Failed to create user record'
-          });
-        }
-      }
-      
-      console.log('👤 Found/created user:', user.id);
       accessToken = await DatabaseService.getValidClioToken(user.id);
       console.log('🔍 Database token check:', accessToken ? 'Found' : 'Not found');
     } catch (dbError) {
@@ -89,11 +84,8 @@ export async function GET(request: NextRequest) {
         
         // Clear the invalid token from database
         try {
-          const defaultUser = await DatabaseService.getDefaultUser();
-          if (defaultUser) {
-            await DatabaseService.deleteClioToken(defaultUser.id);
-            console.log('🗑️ Cleared invalid token from database');
-          }
+          await DatabaseService.deleteClioToken(user.id);
+          console.log('🗑️ Cleared invalid token from database');
         } catch (clearError) {
           console.error('Error clearing invalid token:', clearError);
         }

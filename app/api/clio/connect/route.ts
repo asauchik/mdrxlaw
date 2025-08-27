@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
+import { supabase } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user email from request body
-    const body = await request.json();
-    const userEmail = body.userEmail;
-    
-    if (!userEmail) {
+    // Get user from session
+    const authorization = request.headers.get('authorization');
+    if (!authorization) {
       return NextResponse.json({
-        error: 'User email is required'
-      }, { status: 400 });
+        error: 'Authorization required'
+      }, { status: 401 });
+    }
+
+    const token = authorization.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Invalid authentication'
+      }, { status: 401 });
     }
 
     const clioClientId = process.env.CLIO_CLIENT_ID;
@@ -28,14 +36,14 @@ export async function POST(request: NextRequest) {
     authUrl.searchParams.append('client_id', clioClientId);
     authUrl.searchParams.append('redirect_uri', clioRedirectUri);
     
-    // Add user email as state parameter to track which user is authenticating
-    authUrl.searchParams.append('state', userEmail);
+    // Add user ID as state parameter to track which user is authenticating
+    authUrl.searchParams.append('state', user.id);
     
     // Debug logging
     console.log('=== CLIO OAuth Debug ===');
     console.log('Client ID:', clioClientId);
     console.log('Redirect URI:', clioRedirectUri);
-    console.log('User Email:', userEmail);
+    console.log('User ID:', user.id);
     console.log('Full OAuth URL:', authUrl.toString());
     console.log('========================');
     

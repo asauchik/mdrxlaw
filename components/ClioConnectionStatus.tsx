@@ -14,17 +14,21 @@ interface ClioStatus {
 }
 
 export default function ClioConnectionStatus() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [status, setStatus] = useState<ClioStatus>({ isConnected: false });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkConnection = async () => {
-      if (!user) return;
+      if (!user || !session) return;
       
       try {
         setLoading(true);
-        const response = await fetch(`/api/clio/status?userEmail=${encodeURIComponent(user.email || '')}`);
+        const response = await fetch('/api/clio/status', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
         const data = await response.json();
         setStatus(data);
       } catch (err) {
@@ -39,14 +43,18 @@ export default function ClioConnectionStatus() {
     };
 
     checkConnection();
-  }, [user]);
+  }, [user, session]);
 
   const checkClioConnection = async () => {
-    if (!user) return;
+    if (!user || !session) return;
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/clio/status?userEmail=${encodeURIComponent(user.email || '')}`);
+      const response = await fetch('/api/clio/status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
       const data = await response.json();
       setStatus(data);
     } catch (err) {
@@ -61,7 +69,7 @@ export default function ClioConnectionStatus() {
   };
 
   const connectToClio = async () => {
-    if (!user) return;
+    if (!user || !session) return;
     
     try {
       setLoading(true);
@@ -69,8 +77,9 @@ export default function ClioConnectionStatus() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ userEmail: user.email })
+        body: JSON.stringify({ userId: user.id })
       });
       
       if (!response.ok) {
@@ -98,7 +107,7 @@ export default function ClioConnectionStatus() {
   };
 
   const disconnectFromClio = async () => {
-    if (!user) return;
+    if (!user || !session) return;
     
     try {
       setLoading(true);
@@ -106,8 +115,9 @@ export default function ClioConnectionStatus() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ userEmail: user.email })
+        body: JSON.stringify({ userId: user.id })
       });
       
       if (!response.ok) {

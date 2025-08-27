@@ -1,32 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
+import { supabase } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user email from request body
-    const body = await request.json();
-    const userEmail = body.userEmail;
-    
-    if (!userEmail) {
+    // Get user from session
+    const authorization = request.headers.get('authorization');
+    if (!authorization) {
       return NextResponse.json({
-        error: 'User email is required'
-      }, { status: 400 });
+        error: 'Authorization required'
+      }, { status: 401 });
+    }
+
+    const token = authorization.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Invalid authentication'
+      }, { status: 401 });
     }
 
     // Try to get token from database first for revocation
     let accessToken = null;
-    let user = null;
     
     try {
-      user = await DatabaseService.getUserByEmail(userEmail);
-      if (user) {
-        accessToken = await DatabaseService.getValidClioToken(user.id);
-      }
+      accessToken = await DatabaseService.getValidClioToken(user.id);
     } catch (dbError) {
       console.error('Database error getting token for revocation:', dbError);
     }
 
-    if (accessToken && user) {
+    if (accessToken) {
       try {
         // Revoke the token with CLIO using their API
         const revokeResponse = await fetch('https://app.clio.com/oauth/deauthorize', {
@@ -52,10 +56,8 @@ export async function POST(request: NextRequest) {
 
     // Clear the token from database
     try {
-      if (user) {
-        await DatabaseService.deleteClioToken(user.id);
-        console.log('✅ Token cleared from database for user:', userEmail);
-      }
+      await DatabaseService.deleteClioToken(user.id);
+      console.log('✅ Token cleared from database for user:', user.id);
     } catch (dbError) {
       console.error('Database error clearing token:', dbError);
       // Continue even if database cleanup fails

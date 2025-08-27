@@ -1,88 +1,64 @@
-import { supabaseAdmin, ClioToken, User } from './supabase';
+import { supabaseAdmin, ClioToken } from './supabase';
+
+// Auth user type that matches auth.users
+interface AuthUser {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export class DatabaseService {
-  // User management
-  static async createUser(email: string, name?: string, clioUserId?: string): Promise<User | null> {
+  // User management - using auth.users directly
+  static async getUserByEmail(email: string): Promise<AuthUser | null> {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .insert([{ email, name, clio_user_id: clioUserId }])
-        .select()
-        .single();
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers();
 
       if (error) {
-        console.error('Error creating user:', error);
+        console.error('Error listing users:', error);
         return null;
       }
 
-      console.log('✅ User created successfully:', data.id);
-      return data;
-    } catch (error) {
-      console.error('Database error creating user:', error);
-      return null;
-    }
-  }
-
-  static async getUserByEmail(email: string): Promise<User | null> {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error getting user by email:', error);
+      const user = data.users.find(u => u.email === email);
+      if (!user) {
         return null;
       }
 
-      return data;
+      return {
+        id: user.id,
+        email: user.email || '',
+        created_at: user.created_at,
+        updated_at: user.updated_at || user.created_at,
+      };
     } catch (error) {
       console.error('Database error getting user by email:', error);
       return null;
     }
   }
 
-  static async getUserByClioId(clioUserId: string): Promise<User | null> {
+  static async getUserById(userId: string): Promise<AuthUser | null> {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .eq('clio_user_id', clioUserId)
-        .single();
+      const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error getting user by CLIO ID:', error);
+      if (error) {
+        console.error('Error getting user by ID:', error);
         return null;
       }
 
-      return data;
+      if (!data.user) {
+        return null;
+      }
+
+      return {
+        id: data.user.id,
+        email: data.user.email || '',
+        created_at: data.user.created_at,
+        updated_at: data.user.updated_at || data.user.created_at,
+      };
     } catch (error) {
-      console.error('Database error getting user by CLIO ID:', error);
+      console.error('Database error getting user by ID:', error);
       return null;
     }
-  }
-
-  // Default user management for single-user app
-  static async getDefaultUser(): Promise<User | null> {
-    console.log('🔍 Looking for default user: default@mdrxlaw.com');
-    
-    let user = await this.getUserByEmail('default@mdrxlaw.com');
-    
-    if (!user) {
-      console.log('👤 Creating default user...');
-      user = await this.createUser('default@mdrxlaw.com', 'Default User');
-      
-      if (user) {
-        console.log('✅ Created default user:', user.id);
-      } else {
-        console.error('❌ Failed to create default user');
-      }
-    } else {
-      console.log('✅ Found existing default user:', user.id);
-    }
-    
-    return user;
   }
 
   // Token management
@@ -211,20 +187,23 @@ export class DatabaseService {
   }
 
   // Utility methods for debugging
-  static async getAllUsers(): Promise<User[]> {
+  static async getAllAuthUsers(): Promise<AuthUser[]> {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .select('*');
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers();
 
       if (error) {
-        console.error('Error getting all users:', error);
+        console.error('Error getting all auth users:', error);
         return [];
       }
 
-      return data || [];
+      return data.users.map(user => ({
+        id: user.id,
+        email: user.email || '',
+        created_at: user.created_at,
+        updated_at: user.updated_at || user.created_at,
+      }));
     } catch (error) {
-      console.error('Database error getting all users:', error);
+      console.error('Database error getting all auth users:', error);
       return [];
     }
   }
