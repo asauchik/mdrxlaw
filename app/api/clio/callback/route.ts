@@ -146,12 +146,37 @@ export async function GET(request: NextRequest) {
         );
       }
     } catch (dbError) {
-      console.error('Database storage error:', dbError);
-      console.error('Error details:', {
+      console.error('❌ Database storage error:', dbError);
+      console.error('📊 Error context:', {
         message: dbError instanceof Error ? dbError.message : 'Unknown error',
+        stack: dbError instanceof Error ? dbError.stack : 'No stack trace',
         userId,
-        tokenDataKeys: Object.keys(tokenData)
+        userIdLength: userId?.length,
+        userIdType: typeof userId,
+        tokenDataKeys: Object.keys(tokenData),
+        accessTokenLength: tokenData.access_token?.length,
+        refreshTokenLength: tokenData.refresh_token?.length,
+        tokenType: tokenData.token_type,
+        expiresIn: tokenData.expires_in,
+        scope: tokenData.scope
       });
+      
+      // Try to store just a minimal token to test database connectivity
+      try {
+        console.log('🧪 Testing minimal database connection...');
+        const testResult = await DatabaseService.storeClioToken(
+          userId,
+          'test_token_' + Date.now(),
+          undefined,
+          'Bearer',
+          3600,
+          'test'
+        );
+        console.log('🧪 Minimal test result:', testResult ? 'Success' : 'Failed');
+      } catch (testError) {
+        console.error('🧪 Minimal test also failed:', testError);
+      }
+      
       return NextResponse.redirect(
         new URL('/?error=Database error', baseUrl)
       );
