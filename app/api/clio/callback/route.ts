@@ -96,18 +96,28 @@ export async function GET(request: NextRequest) {
 
     const tokenData = await tokenResponse.json();
     
-    console.log('🔍 Raw token response from CLIO:', {
+    console.log('🔍 Raw token response from CLIO:', tokenData);
+    console.log('🔍 Token response analysis:', {
       access_token: tokenData.access_token ? 'Present' : 'Missing',
       refresh_token: tokenData.refresh_token ? 'Present' : 'Missing',
       expires_in: tokenData.expires_in,
       token_type: tokenData.token_type,
-      scope: tokenData.scope
+      scope: tokenData.scope,
+      error: tokenData.error,
+      error_description: tokenData.error_description
     });
     
-    if (!tokenData.access_token) {
-      console.error('No access token in response:', tokenData);
+    if (tokenData.error) {
+      console.error('❌ CLIO OAuth Error in token response:', tokenData.error, tokenData.error_description);
       return NextResponse.redirect(
-        new URL('/?error=No access token received', baseUrl)
+        new URL(`/?error=CLIO OAuth Error: ${tokenData.error_description || tokenData.error}`, baseUrl)
+      );
+    }
+    
+    if (!tokenData.access_token) {
+      console.error('❌ No access token in response:', tokenData);
+      return NextResponse.redirect(
+        new URL('/?error=No access token received from CLIO', baseUrl)
       );
     }
 
